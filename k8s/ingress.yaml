@@ -5,23 +5,33 @@ metadata:
   namespace: learning01
 spec:
   rules:
-  - host: app.<VM-IP>.nip.io
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: react-svc
-            port:
-              number: 80
-  - host: api.10-0-2-15.nip.io
-    http:
-      paths:
-      - path: /spring/api
-        pathType: Prefix
-        backend:
-          service:
-            name: spring-svc
-            port:
-              number: 8080
+    - host: APP_HOST
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: react-svc
+                port:
+                  number: 80
+    - host: API_HOST
+      http:
+        paths:
+          - path: /spring/api
+            pathType: Prefix
+            backend:
+              service:
+                name: spring-svc
+                port:
+                  number: 8080
+    - host: VERTX_HOST
+      http:
+        paths:
+          - path: /stream
+            pathType: Prefix
+            backend:
+              service:
+                name: vertx-svc
+                port:
+                  number: 8080
