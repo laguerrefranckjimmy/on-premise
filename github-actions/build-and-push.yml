@@ -1,146 +1,22 @@
-name: CI Build and Deploy
+name: CI Build and Deploy on VM
 
 on:
   push:
-    branches: [ main ]
-
-env:
-  GITHUB_USER: laguerrefranckjimmy
-  REPO_NAME: on-premise
-  BRANCH: main
-  GHCR_USER: laguerrefranckjimmy
-  GHCR_PAT: ${{ secrets.GHCR_PAT }}
-  SPRING_DIR: spring-api
-  VERTX_DIR: vertx-service
-  REACT_DIR: react-app
-  SPRING_DOCKERFILE: docker/Dockerfile.spring
-  VERTX_DOCKERFILE: docker/Dockerfile.vertx
-  REACT_DOCKERFILE: docker/Dockerfile.react
-  K8S_NAMESPACE: learning01
-  K8S_DEPLOY_SPRING: spring-api
-  K8S_DEPLOY_VERTX: vertx
-  K8S_DEPLOY_REACT: react
-  VM_IP: 10.0.2.15
-  NIP_DOMAIN: nip.io
-  INGRESS_FILE: k8s/ingress.yaml
-  INGRESS_TMP: k8s/ingress.tmp.yaml
+    branches:
+      - main
 
 jobs:
   build-deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 11
-        uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 11
+      - name: Make script executable
+        run: chmod +x ./update_and_deploy.sh
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20
-
-      - name: Install Docker
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
-          sudo systemctl start docker
-          sudo systemctl enable docker
-
-      - name: Build Spring Boot
-        working-directory: ${{ env.SPRING_DIR }}
-        run: |
-          if [ -f "./mvnw" ]; then
-            ./mvnw clean package -DskipTests
-          else
-            mvn clean package -DskipTests
-          fi
-
-      - name: Build Vert.x
-        working-directory: ${{ env.VERTX_DIR }}
-        run: mvn clean package -DskipTests
-
-      - name: Build React
-        working-directory: ${{ env.REACT_DIR }}
-        run: |
-          npm install
-          npm run build
-
-      - name: Log in to GHCR
-        run: echo ${{ env.GHCR_PAT }} | docker login ghcr.io -u ${{ env.GHCR_USER }} --password-stdin
-
-      - name: Build & Push Docker Images
-        run: |
-          declare -A IMAGES
-          IMAGES=( ["spring-api"]=$SPRING_DOCKERFILE ["vertx-service"]=$VERTX_DOCKERFILE ["react-app"]=$REACT_DOCKERFILE )
-
-          for SERVICE in "${!IMAGES[@]}"; do
-            echo "Processing $SERVICE..."
-            DOCKERFILE=${IMAGES[$SERVICE]}
-            DIR=""
-            case $SERVICE in
-              "spring-api") DIR=$SPRING_DIR ;;
-              "vertx-service") DIR=$VERTX_DIR ;;
-              "react-app") DIR=$REACT_DIR ;;
-            esac
-            docker build -t ghcr.io/${{ env.GHCR_USER }}/$SERVICE:latest -f $DOCKERFILE $DIR
-            docker push ghcr.io/${{ env.GHCR_USER }}/$SERVICE:latest
-          done
-
-      - name: Apply K8s Manifests
-        run: |
-          kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/deploy-spring.yaml
-          kubectl apply -f k8s/deploy-vertx.yaml
-          kubectl apply -f k8s/deploy-react.yaml
-
-      - name: Update Ingress Hostnames
-        run: |
-          sed -e "s/APP_HOST/app.${{ env.VM_IP }}.${{ env.NIP_DOMAIN }}/" \
-              -e "s/API_HOST/api.${{ env.VM_IP }}.${{ env.NIP_DOMAIN }}/" \
-              -e "s/VERTX_HOST/vertx.${{ env.VM_IP }}.${{ env.NIP_DOMAIN }}/" \
-              ${{ env.INGRESS_FILE }} > ${{ env.INGRESS_TMP }}
-          kubectl apply -f ${{ env.INGRESS_TMP }}
-
-      - name: Wait for Deployments with Retry & Rollback
-        run: |
-          set -e
-          NAMESPACE=${{ env.K8S_NAMESPACE }}
-          DEPLOYMENTS=("${{ env.K8S_DEPLOY_SPRING }}" "${{ env.K8S_DEPLOY_VERTX }}" "${{ env.K8S_DEPLOY_REACT }}")
-          MAX_RETRIES=3
-          SLEEP_TIME=10
-
-          for DEP in "${DEPLOYMENTS[@]}"; do
-            echo "Checking rollout status for $DEP..."
-            for i in $(seq 1 $MAX_RETRIES); do
-              if kubectl -n $NAMESPACE rollout status deployment/$DEP --timeout=60s; then
-                echo "$DEP rollout successful!"
-                break
-              else
-                echo "Attempt $i/$MAX_RETRIES failed for $DEP."
-                if [ $i -lt $MAX_RETRIES ]; then
-                  echo "Retrying in $SLEEP_TIME seconds..."
-                  sleep $SLEEP_TIME
-                else
-                  echo "$DEP deployment failed. Rolling back..."
-                  kubectl -n $NAMESPACE rollout undo deployment/$DEP
-                  echo "Rollback triggered for $DEP"
-                  exit 1
-                fi
-              fi
-            done
-          done
-
-      - name: List Pods & Services
-        run: kubectl -n ${{ env.K8S_NAMESPACE }} get pods,svc
-
-      - name: Print Access URLs
-        run: |
-          echo "✅ All deployments updated successfully!"
-          echo "React frontend: http://app.${{ env.VM_IP }}.${{ env.NIP_DOMAIN }}"
-          echo "Spring Boot API: http://api.${{ env.VM_IP }}.${{ env.NIP_DOMAIN }}/spring/api/items"
-          echo "Vert.x stream: http://vertx.${{ env.VM_IP }}.${{ env.NIP_DOMAIN }}/stream"
+      - name: Run deployment script
+        run: ./update_and_deploy.sh
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
