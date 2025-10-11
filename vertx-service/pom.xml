@@ -33,6 +33,9 @@
   </dependencies>
 
   <build>
+
+    <!-- Set the final JAR name -->
+  <finalName>vertx-service</finalName>
     <plugins>
       <!-- Compile plugin -->
       <plugin>

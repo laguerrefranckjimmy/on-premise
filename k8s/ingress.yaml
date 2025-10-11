@@ -15,7 +15,7 @@ spec:
             name: react-svc
             port:
               number: 80
-  - host: api.<VM-IP>.nip.io
+  - host: api.10-0-2-15.nip.io
     http:
       paths:
       - path: /spring/api
