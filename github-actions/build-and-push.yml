@@ -2,34 +2,67 @@ name: CI Build and Push
 on:
   push:
     branches: [ main ]
+
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Build Spring
-        run: |
-          cd spring-api
-          mvn -B -DskipTests package
-          docker build -f docker/Dockerfile.spring -t ghcr.io/${{ github.repository_owner }}/spring-api:latest .
-          echo "built spring"
-      - name: Build Vert.x
-        run: |
-          cd vertx-service
-          mvn -B -DskipTests package
-          docker build -f docker/Dockerfile.vertx -t ghcr.io/${{ github.repository_owner }}/vertx-service:latest .
-      - name: Build React Image
-        run: |
-          cd react-app
-          npm run build
-          cd ..
-          docker build -f docker/Dockerfile.react -t ghcr.io/${{ github.repository_owner }}/react-app:latest .
-      - name: Push images
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Set up Java for Spring Boot & Vert.x
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 3️⃣ Set up Node.js for React
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      # 4️⃣ Login to GitHub Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 5️⃣ Build Spring Boot app + Docker image
+      - name: Build Spring Boot
+        run: |
+          cd spring-api
+          mvn -B -DskipTests clean package
+          docker build -f ../docker/Dockerfile.spring \
+            -t ghcr.io/${{ github.repository_owner }}/spring-api:latest .
+          cd ..
+
+      # 6️⃣ Build Vert.x app + Docker image
+      - name: Build Vert.x
+        run: |
+          cd vertx-service
+          mvn -B -DskipTests clean package
+          docker build -f ../docker/Dockerfile.vertx \
+            -t ghcr.io/${{ github.repository_owner }}/vertx-service:latest .
+          cd ..
+
+      # 7️⃣ Build React app + Docker image
+      - name: Build React
+        run: |
+          cd react-app
+          npm ci
+          npm run build
+          cd ..
+          docker build -f docker/Dockerfile.react \
+            -t ghcr.io/${{ github.repository_owner }}/react-app:latest .
+
+      # 8️⃣ Push Docker images to GHCR
+      - name: Push images
         run: |
           docker push ghcr.io/${{ github.repository_owner }}/spring-api:latest
           docker push ghcr.io/${{ github.repository_owner }}/vertx-service:latest
