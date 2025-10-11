@@ -39,6 +39,12 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>3.3.3</version> <!-- or the version matching your Spring Boot -->
+      </plugin>
     </plugins>
   </build>
 </project>
