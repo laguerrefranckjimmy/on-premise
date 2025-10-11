@@ -1,5 +1,5 @@
 FROM eclipse-temurin:11-jre-alpine
 WORKDIR /app
-COPY target/spring-api.jar /app/app.jar
+COPY target/*.jar /app/app.jar
 EXPOSE 8080
 CMD ["java","-jar","/app/app.jar"]
