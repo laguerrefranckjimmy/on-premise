@@ -1,5 +1,5 @@
 FROM eclipse-temurin:11-jre-alpine
 WORKDIR /app
-COPY ../vertx-service/target/vertx-service.jar /app/vertx.jar
+COPY target/vertx-service.jar /app/vertx.jar
 EXPOSE 8080
 CMD ["java","-jar","/app/vertx.jar"]
