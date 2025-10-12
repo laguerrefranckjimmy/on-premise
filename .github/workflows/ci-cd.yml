@@ -15,35 +15,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up Docker
+      # 2️⃣ Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      # 3️⃣ Log in to GitHub Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          username: ${{ secrets.GHCR_USER }}
-          password: ${{ secrets.GHCR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3️⃣ Set up Java (for Maven)
+      # 4️⃣ Set up Java (for Maven)
       - name: Set up Java 11
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 11
 
-      # 4️⃣ Set up Node.js (for React build)
+      # 5️⃣ Set up Node.js (for React build)
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
           cache: "npm"
 
-      # 5️⃣ Run your deployment script
+      # 6️⃣ Run your deployment script
       - name: Run update_and_deploy.sh
-        env:
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}
         run: |
           chmod +x ./update_and_deploy.sh
           ./update_and_deploy.sh
