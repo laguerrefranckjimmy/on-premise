@@ -12,8 +12,13 @@ services:
       COUCHBASE_ADMINISTRATOR_PASSWORD: password
     volumes:
       - couchbase_data:/opt/couchbase/var
+    mem_limit: 1g
     restart: unless-stopped
-    mem_limit: 1.5g
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/pools"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -31,8 +36,13 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
       - kafka_data:/var/lib/kafka
+    mem_limit: 700m
     restart: unless-stopped
-    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cub kafka-ready -b localhost:9092 1 20"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
 
 volumes:
   couchbase_data:

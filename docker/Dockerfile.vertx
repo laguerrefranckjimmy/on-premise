@@ -1,5 +1,13 @@
+# Stage 1: build Vert.x JAR
+FROM eclipse-temurin:11 as build
+WORKDIR /app
+COPY mvnw pom.xml ./
+COPY src ./src
+RUN ./mvnw clean package -DskipTests
+
+# Stage 2: runtime
 FROM eclipse-temurin:11-jre-alpine
 WORKDIR /app
-COPY target/vertx-service.jar /app/vertx.jar
+COPY --from=build /app/target/vertx-service.jar ./vertx.jar
 EXPOSE 8080
-CMD ["java","-jar","/app/vertx.jar"]
+CMD ["java", "-jar", "/app/vertx.jar"]

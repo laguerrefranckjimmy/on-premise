@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  spring-api:
+    build:
+      context: ./spring-api
+      dockerfile: docker/Dockerfile.spring
+    image: ghcr.io/laguerrefranckjimmy/spring-api:latest
+    mem_limit: 1.2g
+
+  vertx-service:
+    build:
+      context: ./vertx-service
+      dockerfile: docker/Dockerfile.vertx
+    image: ghcr.io/laguerrefranckjimmy/vertx-service:latest
+    mem_limit: 1g
+
+  react-app:
+    build:
+      context: ./react-app
+      dockerfile: docker/Dockerfile.react
+    image: ghcr.io/laguerrefranckjimmy/react-app:latest
+    mem_limit: 800m
