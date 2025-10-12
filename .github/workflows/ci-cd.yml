@@ -54,5 +54,5 @@ jobs:
       # 7️⃣ Run your deployment script
       - name: Run update_and_deploy.sh
         run: |
-          chmod +x ./update_and_deploy.sh
-          ./update_and_deploy.sh
+          chmod +x ./scripts/update_and_deploy.sh
+          ./scripts/update_and_deploy.sh
