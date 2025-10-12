@@ -1,10 +1,9 @@
 name: CI/CD Deploy
 
-# Trigger on push to main branch AND manual trigger
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:    # 👈 enables "Run workflow" button in GitHub
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -41,7 +40,20 @@ jobs:
           node-version: 20
           cache: "npm"
 
-      # 6️⃣ Run your deployment script
+      # 6️⃣ Conditionally restore npm cache if lock file exists
+      - name: Conditionally install npm dependencies
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
+            echo "Lock file found, installing dependencies with cache..."
+            npm ci
+          elif [ -f package.json ]; then
+            echo "No lock file found, installing dependencies without cache..."
+            npm install
+          else
+            echo "No Node.js project found, skipping npm install"
+          fi
+
+      # 7️⃣ Run your deployment script
       - name: Run update_and_deploy.sh
         run: |
           chmod +x ./update_and_deploy.sh
