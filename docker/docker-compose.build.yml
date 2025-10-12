@@ -1,21 +1,22 @@
+# docker/docker-compose.build.yml
 services:
   spring-api:
     build:
-      context: ../spring-api      # path to spring-api source
-      dockerfile: docker/Dockerfile.spring  # Dockerfile inside docker/
+      context: ../spring-api          # path to Spring Boot source
+      dockerfile: Dockerfile.spring   # relative to compose file (docker/)
     image: ghcr.io/laguerrefranckjimmy/spring-api:latest
     mem_limit: 1.2g
 
   vertx-service:
     build:
       context: ../vertx-service
-      dockerfile: docker/Dockerfile.vertx
+      dockerfile: Dockerfile.vertx
     image: ghcr.io/laguerrefranckjimmy/vertx-service:latest
     mem_limit: 1g
 
   react-app:
     build:
       context: ../react-app
-      dockerfile: docker/Dockerfile.react
+      dockerfile: Dockerfile.react
     image: ghcr.io/laguerrefranckjimmy/react-app:latest
     mem_limit: 800m
