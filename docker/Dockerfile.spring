@@ -1,12 +1,12 @@
-# Stage 1: build Spring JAR
+# Build stage
 FROM eclipse-temurin:11 as build
 WORKDIR /app
-COPY mvnw pom.xml ./
+COPY pom.xml mvnw ./
 COPY src ./src
 RUN ./mvnw clean package -DskipTests
 
-# Stage 2: runtime
+# Run stage
 FROM eclipse-temurin:11-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/*.jar ./app.jar
+COPY --from=build /app/target/*.jar app.jar
 CMD ["java", "-jar", "/app/app.jar"]
