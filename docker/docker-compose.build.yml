@@ -1,21 +1,31 @@
+# Build and push images for all services
 services:
   spring-api:
     build:
-      context: ../spring-api       # points to spring-api folder
-      dockerfile: ../docker/Dockerfile.spring  # Dockerfile relative to context
+      context: ../spring-api
+      dockerfile: ../docker/Dockerfile.spring
+      cache_from:
+        - ghcr.io/laguerrefranckjimmy/spring-api:latest
+      cache_to:
+        - type=inline
     image: ghcr.io/laguerrefranckjimmy/spring-api:latest
-    mem_limit: 1.2g
 
   vertx-service:
     build:
       context: ../vertx-service
       dockerfile: ../docker/Dockerfile.vertx
+      cache_from:
+        - ghcr.io/laguerrefranckjimmy/vertx-service:latest
+      cache_to:
+        - type=inline
     image: ghcr.io/laguerrefranckjimmy/vertx-service:latest
-    mem_limit: 1g
 
   react-app:
     build:
       context: ../react-app
       dockerfile: ../docker/Dockerfile.react
+      cache_from:
+        - ghcr.io/laguerrefranckjimmy/react-app:latest
+      cache_to:
+        - type=inline
     image: ghcr.io/laguerrefranckjimmy/react-app:latest
-    mem_limit: 800m
