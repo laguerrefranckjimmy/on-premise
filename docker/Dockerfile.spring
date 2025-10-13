@@ -1,12 +1,24 @@
 # Build stage
 FROM eclipse-temurin:11 as build
-WORKDIR /app
-COPY pom.xml mvnw ./
-COPY src ./src
-RUN ./mvnw clean package -DskipTests
 
-# Run stage
+# Install Maven
+RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy project files
+COPY pom.xml ./
+COPY src ./src
+
+# Build the JAR
+RUN mvn clean package -DskipTests
+
+# Runtime stage
 FROM eclipse-temurin:11-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
+
+# Expose port (adjust if needed)
+EXPOSE 8080
+
 CMD ["java", "-jar", "/app/app.jar"]
