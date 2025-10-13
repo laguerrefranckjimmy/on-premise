@@ -10,7 +10,7 @@ jobs:
     runs-on: self-hosted
     env:
       GHCR_USER: laguerrefranckjimmy
-      GHCR_REGISTRY: ghcr.io
+      GHCR_REGISTRY: ghcr.io/laguerrefranckjimmy
       K8S_NAMESPACE: learning01
       VM_IP: 10.0.2.15
       NIP_DOMAIN: nip.io
@@ -36,13 +36,13 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 4️⃣ Login to GitHub Container Registry (using PAT)
+      # 4️⃣ Login to GitHub Container Registry
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ env.GHCR_USER }}
-          password: ${{ secrets.GHCR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # 5️⃣ Build & Push Docker Images
       - name: Build & Push Docker Images
@@ -50,11 +50,11 @@ jobs:
           docker compose -f docker/docker-compose.build.yml build
           docker compose -f docker/docker-compose.build.yml push
 
-      # 6️⃣ Start Couchbase & Kafka infra
+      # 6️⃣ Start Couchbase & Kafka
       - name: Start Infra Services
         run: docker compose -f docker/docker-compose-services.yml up -d
 
-      # 7️⃣ Wait for infra readiness
+      # 7️⃣ Wait for Infra readiness via Docker healthchecks
       - name: Wait for Couchbase & Kafka
         run: |
           echo "Waiting for Couchbase..."
@@ -88,14 +88,14 @@ jobs:
               k8s/ingress.yaml > k8s/ingress.tmp.yaml
           kubectl apply -f k8s/ingress.tmp.yaml
 
-      # 🔟 Wait for rollouts
+      # 🔟 Wait for Kubernetes rollouts
       - name: Verify K8s Rollouts
         run: |
           kubectl -n $K8S_NAMESPACE rollout status deployment/spring-api
           kubectl -n $K8S_NAMESPACE rollout status deployment/vertx
           kubectl -n $K8S_NAMESPACE rollout status deployment/react
 
-      # 1️⃣1️⃣ Show infra container status & logs
+      # 1️⃣1️⃣ Show Infra container status and logs
       - name: Show Infra Status
         run: |
           echo "Couchbase container status:"
@@ -107,7 +107,7 @@ jobs:
           echo "Kafka logs (last 10 lines):"
           docker logs --tail 10 kafka
 
-      # 1️⃣2️⃣ Print access URLs
+      # 1️⃣2️⃣ Print Access URLs
       - name: Print Access URLs
         run: |
           echo "React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"
