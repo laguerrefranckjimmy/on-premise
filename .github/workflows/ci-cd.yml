@@ -36,13 +36,13 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 4️⃣ Login to GitHub Container Registry
-      - name: Login to GHCR
+      # 4️⃣ Authenticate to GitHub Container Registry (GHCR)
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ env.GHCR_USER }}
+          password: ${{ secrets.GHCR_PAT }}
 
       # 5️⃣ Build & Push Docker Images
       - name: Build & Push Docker Images
@@ -54,7 +54,7 @@ jobs:
       - name: Start Infra Services
         run: docker compose -f docker/docker-compose-services.yml up -d
 
-      # 7️⃣ Wait for Infra readiness via Docker healthchecks
+      # 7️⃣ Wait for Couchbase & Kafka to be healthy
       - name: Wait for Couchbase & Kafka
         run: |
           echo "Waiting for Couchbase..."
@@ -62,14 +62,14 @@ jobs:
             echo "Couchbase not ready..."
             sleep 5
           done
-          echo "Couchbase ready!"
+          echo "✅ Couchbase ready!"
 
           echo "Waiting for Kafka..."
           until [ "$(docker inspect --format='{{.State.Health.Status}}' kafka)" == "healthy" ]; do
             echo "Kafka not ready..."
             sleep 5
           done
-          echo "Kafka ready!"
+          echo "✅ Kafka ready!"
 
       # 8️⃣ Deploy to Kubernetes
       - name: Deploy to Kubernetes
@@ -79,7 +79,7 @@ jobs:
           kubectl apply -f k8s/deploy-vertx.yaml
           kubectl apply -f k8s/deploy-react.yaml
 
-      # 9️⃣ Apply Ingress with dynamic hosts
+      # 9️⃣ Apply Ingress dynamically
       - name: Apply Ingress
         run: |
           sed -e "s/APP_HOST/app.${VM_IP}.${NIP_DOMAIN}/" \
@@ -88,14 +88,14 @@ jobs:
               k8s/ingress.yaml > k8s/ingress.tmp.yaml
           kubectl apply -f k8s/ingress.tmp.yaml
 
-      # 🔟 Wait for Kubernetes rollouts
+      # 🔟 Verify Kubernetes rollouts
       - name: Verify K8s Rollouts
         run: |
           kubectl -n $K8S_NAMESPACE rollout status deployment/spring-api
           kubectl -n $K8S_NAMESPACE rollout status deployment/vertx
           kubectl -n $K8S_NAMESPACE rollout status deployment/react
 
-      # 1️⃣1️⃣ Show Infra container status and logs
+      # 1️⃣1️⃣ Show container status
       - name: Show Infra Status
         run: |
           echo "Couchbase container status:"
@@ -103,9 +103,9 @@ jobs:
           echo "Kafka container status:"
           docker ps --filter "name=kafka"
           echo "Couchbase logs (last 10 lines):"
-          docker logs --tail 10 couchbase
+          docker logs --tail 10 couchbase || true
           echo "Kafka logs (last 10 lines):"
-          docker logs --tail 10 kafka
+          docker logs --tail 10 kafka || true
 
       # 1️⃣2️⃣ Print Access URLs
       - name: Print Access URLs
