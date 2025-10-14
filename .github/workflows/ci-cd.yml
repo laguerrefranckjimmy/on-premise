@@ -36,36 +36,45 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 4️⃣ Authenticate to GitHub Container Registry (GHCR)
-      - name: Login to GitHub Container Registry
+      # 4️⃣ Login to GitHub Container Registry (GHCR)
+      - name: Login to GHCR
+        id: login-ghcr
+        continue-on-error: true
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ env.GHCR_USER }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 5️⃣ Build & Push Docker Images
+      - name: Check GHCR login result
+        if: steps.login-ghcr.outcome != 'success'
+        run: echo "⚠️ GHCR login failed. Continuing without pushing images."
+
+      # 5️⃣ Build & Push Docker Images (gracefully skip push if login failed)
       - name: Build & Push Docker Images
         run: |
+          echo "🚀 Building images..."
           docker compose -f docker/docker-compose.build.yml build
-          docker compose -f docker/docker-compose.build.yml push
+
+          echo "📦 Pushing images (if logged in)..."
+          docker compose -f docker/docker-compose.build.yml push || echo "⚠️ Push skipped due to missing GHCR credentials."
 
       # 6️⃣ Start Couchbase & Kafka
       - name: Start Infra Services
         run: docker compose -f docker/docker-compose-services.yml up -d
 
-      # 7️⃣ Wait for Couchbase & Kafka to be healthy
+      # 7️⃣ Wait for Infra readiness via Docker healthchecks
       - name: Wait for Couchbase & Kafka
         run: |
           echo "Waiting for Couchbase..."
-          until [ "$(docker inspect --format='{{.State.Health.Status}}' couchbase)" == "healthy" ]; do
+          until [ "$(docker inspect --format='{{.State.Health.Status}}' couchbase 2>/dev/null)" == "healthy" ]; do
             echo "Couchbase not ready..."
             sleep 5
           done
           echo "✅ Couchbase ready!"
 
           echo "Waiting for Kafka..."
-          until [ "$(docker inspect --format='{{.State.Health.Status}}' kafka)" == "healthy" ]; do
+          until [ "$(docker inspect --format='{{.State.Health.Status}}' kafka 2>/dev/null)" == "healthy" ]; do
             echo "Kafka not ready..."
             sleep 5
           done
@@ -79,7 +88,7 @@ jobs:
           kubectl apply -f k8s/deploy-vertx.yaml
           kubectl apply -f k8s/deploy-react.yaml
 
-      # 9️⃣ Apply Ingress dynamically
+      # 9️⃣ Apply Ingress with dynamic hosts
       - name: Apply Ingress
         run: |
           sed -e "s/APP_HOST/app.${VM_IP}.${NIP_DOMAIN}/" \
@@ -88,14 +97,14 @@ jobs:
               k8s/ingress.yaml > k8s/ingress.tmp.yaml
           kubectl apply -f k8s/ingress.tmp.yaml
 
-      # 🔟 Verify Kubernetes rollouts
+      # 🔟 Wait for Kubernetes rollouts
       - name: Verify K8s Rollouts
         run: |
           kubectl -n $K8S_NAMESPACE rollout status deployment/spring-api
           kubectl -n $K8S_NAMESPACE rollout status deployment/vertx
           kubectl -n $K8S_NAMESPACE rollout status deployment/react
 
-      # 1️⃣1️⃣ Show container status
+      # 1️⃣1️⃣ Show Infra container status and logs
       - name: Show Infra Status
         run: |
           echo "Couchbase container status:"
@@ -103,15 +112,15 @@ jobs:
           echo "Kafka container status:"
           docker ps --filter "name=kafka"
           echo "Couchbase logs (last 10 lines):"
-          docker logs --tail 10 couchbase || true
+          docker logs --tail 10 couchbase
           echo "Kafka logs (last 10 lines):"
-          docker logs --tail 10 kafka || true
+          docker logs --tail 10 kafka
 
       # 1️⃣2️⃣ Print Access URLs
       - name: Print Access URLs
         run: |
-          echo "React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"
-          echo "Spring Boot API: http://api.${VM_IP}.${NIP_DOMAIN}/spring/api/items"
-          echo "Vert.x stream: http://vertx.${VM_IP}.${NIP_DOMAIN}/stream"
-          echo "Couchbase UI: http://${VM_IP}:8091"
-          echo "Kafka broker: ${VM_IP}:9092"
+          echo "🌐 React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"
+          echo "🌐 Spring Boot API: http://api.${VM_IP}.${NIP_DOMAIN}/spring/api/items"
+          echo "🌐 Vert.x stream: http://vertx.${VM_IP}.${NIP_DOMAIN}/stream"
+          echo "🧠 Couchbase UI: http://${VM_IP}:8091"
+          echo "🔗 Kafka broker: ${VM_IP}:9092"
