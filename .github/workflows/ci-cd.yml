@@ -13,7 +13,6 @@ jobs:
       K8S_NAMESPACE: learning01
       VM_IP: 10.0.2.15
       NIP_DOMAIN: nip.io
-      COMMIT_SHA: ${{ github.sha }}
 
     steps:
       # 1️⃣ Checkout repository
@@ -32,117 +31,118 @@ jobs:
         with:
           node-version: 20
 
-      # 3️⃣ Setup Docker Buildx
+      # 3️⃣ Cache Maven dependencies
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # 4️⃣ Cache Node modules
+      - name: Cache Node.js dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      # 5️⃣ Setup Docker Buildx
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 4️⃣ Build only changed services & install dependencies
-      - name: Build Changed Services & Dependencies
-        run: |
-          echo "🚀 Checking which services changed..."
-          CHANGED_SERVICES=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -E '^(spring-api|vertx-service|react-app)/' | cut -d/ -f1 | sort -u)
-
-          if [ -z "$CHANGED_SERVICES" ]; then
-            echo "✅ No services changed. Skipping Docker build & dependency install."
-            exit 0
-          fi
-
-          echo "🔨 Services changed: $CHANGED_SERVICES"
-
-          for service in $CHANGED_SERVICES; do
-            echo "🛠 Processing $service..."
-
-            case $service in
-              spring-api)
-                echo "📦 Installing Maven dependencies for $service..."
-                cd ../spring-api
-                mvn -B -DskipTests dependency:resolve
-                cd -
-                ;;
-              vertx-service)
-                echo "📦 Installing Maven dependencies for $service..."
-                cd ../vertx-service
-                mvn -B -DskipTests dependency:resolve
-                cd -
-                ;;
-              react-app)
-                echo "📦 Installing Node.js dependencies for $service..."
-                cd ../react-app
-                npm ci
-                cd -
-                ;;
-            esac
-
-            IMAGE_NAME="${service}:${COMMIT_SHA}"
-            echo "🛠 Building Docker image for $service -> $IMAGE_NAME..."
-            docker compose -f docker/docker-compose.build.yml build --build-arg BUILDKIT_INLINE_CACHE=1 $service
-            docker tag $service:latest $IMAGE_NAME
-          done
-
-      # 5️⃣ Remove old Docker images (except Couchbase & Kafka)
+      # 6️⃣ Remove old images (except Couchbase & Kafka)
       - name: Cleanup old Docker images
         run: |
-          echo "🧹 Removing old Docker images (except couchbase & kafka)..."
-          for image in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep -vE "^(couchbase|kafka)"); do
-            echo "Deleting $image"
-            docker rmi -f $image || true
+          echo "🧹 Removing old Docker images..."
+          docker images -q | while read IMG; do
+            NAME=$(docker inspect --format='{{.Config.Image}}' $IMG 2>/dev/null || echo "")
+            if [[ "$NAME" != "couchbase"* && "$NAME" != "confluentinc/cp-kafka"* ]]; then
+              echo "Deleting $IMG ($NAME)"
+              docker rmi -f $IMG || true
+            fi
           done
 
-      # 6️⃣ Ensure Couchbase & Kafka containers exist and are running
+      # 7️⃣ Build only updated Docker images locally
+      - name: Build Docker Images (local only)
+        run: |
+          echo "🚀 Building updated service images..."
+          docker compose -f docker/docker-compose.build.yml build --pull
+
+      # 8️⃣ Start Couchbase & Kafka (if not running)
       - name: Start Infra Services (Couchbase & Kafka)
         run: |
-          for service in couchbase kafka; do
-            if [ "$(docker ps -q -f name=$service)" ]; then
-              echo "✅ $service already running."
+          for SERVICE in couchbase kafka; do
+            if [ "$(docker ps -q -f name=$SERVICE)" ]; then
+              echo "✅ $SERVICE already running."
             else
-              if [ "$(docker ps -aq -f name=$service)" ]; then
-                echo "⚠️ $service exists but stopped. Starting..."
-                docker start $service
+              if [ "$(docker ps -aq -f name=$SERVICE)" ]; then
+                echo "⚠️ $SERVICE exists but stopped. Starting..."
+                docker start $SERVICE
               else
-                echo "🆕 Creating $service container..."
-                docker compose -f docker/docker-compose-services.yml up -d $service
+                echo "🆕 Creating $SERVICE container..."
+                docker compose -f docker/docker-compose-services.yml up -d $SERVICE
               fi
             fi
           done
 
-      # 7️⃣ Wait for Couchbase & Kafka readiness
-      - name: Wait for Couchbase & Kafka
+      # 9️⃣ Wait for Couchbase & Kafka readiness
+      - name: Wait for Couchbase & Kafka readiness
         run: |
+          # Couchbase
           echo "⏳ Waiting for Couchbase to become healthy..."
-          MAX_RETRIES=30; COUNT=0; STATUS=""
+          MAX_RETRIES=30
+          COUNT=0
+          STATUS=""
           while [ "$COUNT" -lt "$MAX_RETRIES" ]; do
             STATUS=$(docker inspect --format='{{.State.Health.Status}}' couchbase 2>/dev/null || echo "unknown")
-            [ "$STATUS" == "healthy" ] && break
+            if [ "$STATUS" == "healthy" ]; then
+              echo "✅ Couchbase is healthy."
+              break
+            fi
             echo "Couchbase not ready yet... ($((COUNT+1))/$MAX_RETRIES)"
-            sleep 5; COUNT=$((COUNT+1))
+            sleep 5
+            COUNT=$((COUNT + 1))
           done
-          [ "$STATUS" != "healthy" ] && echo "❌ Couchbase failed." >&2 && docker logs couchbase >&2 && exit 1
-          echo "✅ Couchbase is healthy."
+          if [ "$STATUS" != "healthy" ]; then
+            echo "❌ Couchbase failed to become healthy." >&2
+            docker logs couchbase >&2
+            exit 1
+          fi
 
+          # Kafka (port check)
           echo "⏳ Waiting for Kafka to become reachable..."
-          MAX_RETRIES=30; COUNT=0
+          MAX_RETRIES=30
+          COUNT=0
+          HOST=localhost
+          PORT=9092
           while [ "$COUNT" -lt "$MAX_RETRIES" ]; do
-            docker exec kafka bash -c "nc -z localhost 9092" && break
+            nc -z "$HOST" "$PORT" >/dev/null 2>&1
+            if [ "$?" -eq 0 ]; then
+              echo "✅ Kafka is reachable on $HOST:$PORT."
+              break
+            fi
             echo "Kafka not ready yet... ($((COUNT+1))/$MAX_RETRIES)"
-            sleep 5; COUNT=$((COUNT+1))
+            sleep 5
+            COUNT=$((COUNT + 1))
           done
-          [ "$COUNT" -eq "$MAX_RETRIES" ] && echo "❌ Kafka failed." >&2 && docker logs kafka >&2 && exit 1
-          echo "✅ Kafka is reachable."
+          if [ "$COUNT" -eq "$MAX_RETRIES" ]; then
+            echo "❌ Kafka failed to start within timeout." >&2
+            docker logs kafka --tail 50 >&2
+            exit 1
+          fi
 
-      # 8️⃣ Deploy updated services to Kubernetes
+      # 🔟 Deploy to Kubernetes
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f k8s/namespace.yaml
-          for service in spring-api vertx react-app; do
-            if echo "$CHANGED_SERVICES" | grep -q "$service"; then
-              echo "📦 Deploying updated $service..."
-              kubectl apply -f k8s/deploy-$service.yaml
-            else
-              echo "⏭ Skipping $service deployment (no changes)"
-            fi
-          done
+          kubectl apply -f k8s/deploy-spring.yaml
+          kubectl apply -f k8s/deploy-vertx.yaml
+          kubectl apply -f k8s/deploy-react.yaml
 
-      # 9️⃣ Apply Ingress dynamically
+      # 1️⃣1️⃣ Apply Ingress
       - name: Apply Ingress
         run: |
           sed -e "s/APP_HOST/app.${VM_IP}.${NIP_DOMAIN}/" \
@@ -151,20 +151,20 @@ jobs:
               k8s/ingress.yaml > k8s/ingress.tmp.yaml
           kubectl apply -f k8s/ingress.tmp.yaml
 
-      # 🔟 Verify Kubernetes rollouts
+      # 1️⃣2️⃣ Verify Kubernetes rollouts
       - name: Verify K8s Rollouts
         run: |
           kubectl -n $K8S_NAMESPACE rollout status deployment/spring-api
           kubectl -n $K8S_NAMESPACE rollout status deployment/vertx
           kubectl -n $K8S_NAMESPACE rollout status deployment/react
 
-      # 1️⃣1️⃣ Show Infra Status
+      # 1️⃣3️⃣ Show Infra Status
       - name: Show Infra Status
         run: |
           docker ps --filter "name=couchbase"
           docker ps --filter "name=kafka"
 
-      # 1️⃣2️⃣ Print Access URLs
+      # 1️⃣4️⃣ Print Access URLs
       - name: Print Access URLs
         run: |
           echo "🌐 React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"
