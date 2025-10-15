@@ -134,29 +134,29 @@ jobs:
             exit 1
           fi
 
-      # 🔟 Deploy to Kubernetes
+      # 🔟 Deploy to Kubernetes (with sudo)
       - name: Deploy to Kubernetes
         run: |
-          kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/deploy-spring.yaml
-          kubectl apply -f k8s/deploy-vertx.yaml
-          kubectl apply -f k8s/deploy-react.yaml
+          sudo kubectl apply -f k8s/namespace.yaml
+          sudo kubectl apply -f k8s/deploy-spring.yaml
+          sudo kubectl apply -f k8s/deploy-vertx.yaml
+          sudo kubectl apply -f k8s/deploy-react.yaml
 
-      # 1️⃣1️⃣ Apply Ingress
+      # 1️⃣1️⃣ Apply Ingress (with sudo)
       - name: Apply Ingress
         run: |
           sed -e "s/APP_HOST/app.${VM_IP}.${NIP_DOMAIN}/" \
               -e "s/API_HOST/api.${VM_IP}.${NIP_DOMAIN}/" \
               -e "s/VERTX_HOST/vertx.${VM_IP}.${NIP_DOMAIN}/" \
               k8s/ingress.yaml > k8s/ingress.tmp.yaml
-          kubectl apply -f k8s/ingress.tmp.yaml
+          sudo kubectl apply -f k8s/ingress.tmp.yaml
 
-      # 1️⃣2️⃣ Verify Kubernetes rollouts
+      # 1️⃣2️⃣ Verify Kubernetes rollouts (with sudo)
       - name: Verify K8s Rollouts
         run: |
-          kubectl -n $K8S_NAMESPACE rollout status deployment/spring-api
-          kubectl -n $K8S_NAMESPACE rollout status deployment/vertx
-          kubectl -n $K8S_NAMESPACE rollout status deployment/react
+          sudo kubectl -n $K8S_NAMESPACE rollout status deployment/spring-api
+          sudo kubectl -n $K8S_NAMESPACE rollout status deployment/vertx
+          sudo kubectl -n $K8S_NAMESPACE rollout status deployment/react
 
       # 1️⃣3️⃣ Show Infra Status
       - name: Show Infra Status
