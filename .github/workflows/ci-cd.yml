@@ -73,15 +73,15 @@ jobs:
       # 6️⃣ Wait for Infra readiness
       - name: Wait for Couchbase & Kafka readiness
         run: |
-          echo "Waiting for Couchbase to become healthy..."
+          echo "⏳ Waiting for Couchbase to become healthy..."
           until [ "$(docker inspect --format='{{.State.Health.Status}}' couchbase 2>/dev/null)" == "healthy" ]; do
             echo "Couchbase not ready yet..."
             sleep 5
           done
           echo "✅ Couchbase is healthy."
 
-          echo "Waiting for Kafka to become healthy..."
-          until [ "$(docker inspect --format='{{.State.Health.Status}}' kafka 2>/dev/null)" == "healthy" ]; do
+          echo "⏳ Waiting for Kafka to become healthy..."
+          until docker exec kafka cub kafka-ready -b localhost:9092 1 20; do
             echo "Kafka not ready yet..."
             sleep 5
           done
