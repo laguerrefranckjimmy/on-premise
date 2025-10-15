@@ -1,19 +1,21 @@
-FROM eclipse-temurin:11 AS build
+# Use Maven for building
+FROM maven:3.9.2-eclipse-temurin-11 AS build
+
 WORKDIR /app
 
-# 1️⃣ Copy build files for caching dependencies
-COPY build.gradle settings.gradle ./
-RUN ./gradlew --no-daemon build || true
+# 1️⃣ Copy pom.xml first to cache dependencies
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
 # 2️⃣ Copy source code
 COPY src ./src
 
-# 3️⃣ Build final jar
-RUN ./gradlew --no-daemon shadowJar
+# 3️⃣ Build the final jar
+RUN mvn package -DskipTests
 
 # 4️⃣ Final runtime image
 FROM eclipse-temurin:11-jre
 WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
+COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8081
-ENTRYPOINT ["java","-jar","app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
