@@ -35,11 +35,11 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 4️⃣ Build Docker images locally (no push)
+      # 4️⃣ Build all Docker images locally
       - name: Build Docker Images (local only)
         run: |
           echo "🚀 Building all service images locally..."
-          docker compose -f docker/docker-compose.build.yml build
+          docker compose -f docker/docker-compose.build.yml build --no-cache
 
       # 5️⃣ Ensure Couchbase & Kafka containers exist and are running
       - name: Start Infra Services (only if not running)
@@ -73,15 +73,15 @@ jobs:
       # 6️⃣ Wait for Infra readiness
       - name: Wait for Couchbase & Kafka readiness
         run: |
-          echo "⏳ Waiting for Couchbase to become healthy..."
+          echo "Waiting for Couchbase to become healthy..."
           until [ "$(docker inspect --format='{{.State.Health.Status}}' couchbase 2>/dev/null)" == "healthy" ]; do
             echo "Couchbase not ready yet..."
             sleep 5
           done
           echo "✅ Couchbase is healthy."
 
-          echo "⏳ Waiting for Kafka to become healthy..."
-          until docker exec kafka cub kafka-ready -b localhost:9092 1 20; do
+          echo "Waiting for Kafka to become healthy..."
+          until [ "$(docker inspect --format='{{.State.Health.Status}}' kafka 2>/dev/null)" == "healthy" ]; do
             echo "Kafka not ready yet..."
             sleep 5
           done
@@ -95,7 +95,7 @@ jobs:
           kubectl apply -f k8s/deploy-vertx.yaml
           kubectl apply -f k8s/deploy-react.yaml
 
-      # 8️⃣ Apply Ingress (dynamic)
+      # 8️⃣ Apply Ingress dynamically
       - name: Apply Ingress
         run: |
           sed -e "s/APP_HOST/app.${VM_IP}.${NIP_DOMAIN}/" \

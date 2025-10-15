@@ -1,24 +1,41 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: { name: spring-api, namespace: learning01 }
+metadata:
+  name: spring-api
+  namespace: learning01
 spec:
   replicas: 1
-  selector: { matchLabels: {app: spring-api} }
+  selector:
+    matchLabels:
+      app: spring-api
   template:
-    metadata: { labels: {app: spring-api} }
+    metadata:
+      labels:
+        app: spring-api
     spec:
       containers:
-      - name: spring
-        image: your-registry/spring-api:latest
-        resources:
-          requests: { memory: "256Mi", cpu: "250m" }
-          limits: { memory: "512Mi", cpu: "500m" }
-        ports: [{ containerPort: 8080 }]
+        - name: spring-api
+          image: spring-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: COUCHBASE_HOST
+              value: couchbase
+            - name: KAFKA_BROKER
+              value: kafka:9092
+          imagePullPolicy: IfNotPresent
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: spring-svc, namespace: learning01 }
+metadata:
+  name: spring-api
+  namespace: learning01
 spec:
-  type: NodePort
-  ports: [{ port: 8080, targetPort: 8080 }]
-  selector: { app: spring-api }
+  type: ClusterIP
+  selector:
+    app: spring-api
+  ports:
+    - port: 8080
+      targetPort: 8080

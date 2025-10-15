@@ -5,28 +5,16 @@ services:
     build:
       context: ../spring-api
       dockerfile: ../docker/Dockerfile.spring
-      cache_from:
-        - ghcr.io/laguerrefranckjimmy/spring-api:latest
-      cache_to:
-        - type=inline
-    image: ghcr.io/laguerrefranckjimmy/spring-api:latest
+    image: spring-api:latest
 
   vertx-service:
     build:
       context: ../vertx-service
       dockerfile: ../docker/Dockerfile.vertx
-      cache_from:
-        - ghcr.io/laguerrefranckjimmy/vertx-service:latest
-      cache_to:
-        - type=inline
-    image: ghcr.io/laguerrefranckjimmy/vertx-service:latest
+    image: vertx-service:latest
 
   react-app:
     build:
       context: ../react-app
       dockerfile: ../docker/Dockerfile.react
-      cache_from:
-        - ghcr.io/laguerrefranckjimmy/react-app:latest
-      cache_to:
-        - type=inline
-    image: ghcr.io/laguerrefranckjimmy/react-app:latest
+    image: react-app:latest

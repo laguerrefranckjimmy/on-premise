@@ -1,24 +1,37 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: { name: vertx, namespace: learning01 }
+metadata:
+  name: vertx
+  namespace: learning01
 spec:
   replicas: 1
-  selector: { matchLabels: {app: vertx} }
+  selector:
+    matchLabels:
+      app: vertx
   template:
-    metadata: { labels: {app: vertx} }
+    metadata:
+      labels:
+        app: vertx
     spec:
       containers:
-      - name: vertx
-        image: your-registry/vertx-service:latest
-        resources:
-          requests: { memory: "128Mi", cpu: "100m" }
-          limits: { memory: "256Mi", cpu: "250m" }
-        ports: [{ containerPort: 8080 }]
+        - name: vertx
+          image: vertx-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KAFKA_BROKER
+              value: kafka:9092
+          imagePullPolicy: IfNotPresent
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: vertx-svc, namespace: learning01 }
+metadata:
+  name: vertx
+  namespace: learning01
 spec:
-  type: NodePort
-  ports: [{ port: 8080, targetPort: 8080 }]
-  selector: { app: vertx }
+  type: ClusterIP
+  selector:
+    app: vertx
+  ports:
+    - port: 8080
+      targetPort: 8080
