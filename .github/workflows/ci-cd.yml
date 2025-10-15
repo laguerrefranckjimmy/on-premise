@@ -13,6 +13,7 @@ jobs:
       K8S_NAMESPACE: learning01
       VM_IP: 10.0.2.15
       NIP_DOMAIN: nip.io
+      COMMIT_SHA: ${{ github.sha }}
 
     steps:
       # 1️⃣ Checkout repository
@@ -35,94 +36,113 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 4️⃣ Build Docker images locally (no push)
-      - name: Build Docker Images (local only)
+      # 4️⃣ Build only changed services & install dependencies
+      - name: Build Changed Services & Dependencies
         run: |
-          echo "🚀 Building all service images locally..."
-          docker compose -f docker/docker-compose.build.yml build
+          echo "🚀 Checking which services changed..."
+          CHANGED_SERVICES=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -E '^(spring-api|vertx-service|react-app)/' | cut -d/ -f1 | sort -u)
 
-      # 5️⃣ Ensure Couchbase & Kafka containers exist and are running
-      - name: Start Infra Services (only if not running)
-        run: |
-          echo "🔍 Checking Couchbase..."
-          if [ "$(docker ps -q -f name=couchbase)" ]; then
-            echo "✅ Couchbase already running."
-          else
-            if [ "$(docker ps -aq -f name=couchbase)" ]; then
-              echo "⚠️ Couchbase container exists but stopped. Starting..."
-              docker start couchbase
-            else
-              echo "🆕 Creating Couchbase container..."
-              docker compose -f docker/docker-compose-services.yml up -d couchbase
-            fi
+          if [ -z "$CHANGED_SERVICES" ]; then
+            echo "✅ No services changed. Skipping Docker build & dependency install."
+            exit 0
           fi
 
-          echo "🔍 Checking Kafka..."
-          if [ "$(docker ps -q -f name=kafka)" ]; then
-            echo "✅ Kafka already running."
-          else
-            if [ "$(docker ps -aq -f name=kafka)" ]; then
-              echo "⚠️ Kafka container exists but stopped. Starting..."
-              docker start kafka
-            else
-              echo "🆕 Creating Kafka container..."
-              docker compose -f docker/docker-compose-services.yml up -d kafka
-            fi
-          fi
+          echo "🔨 Services changed: $CHANGED_SERVICES"
 
-      # 6️⃣ Wait for Couchbase & Kafka readiness (with timeout)
-      - name: Wait for Couchbase & Kafka readiness (with timeout)
+          for service in $CHANGED_SERVICES; do
+            echo "🛠 Processing $service..."
+
+            case $service in
+              spring-api)
+                echo "📦 Installing Maven dependencies for $service..."
+                cd ../spring-api
+                mvn -B -DskipTests dependency:resolve
+                cd -
+                ;;
+              vertx-service)
+                echo "📦 Installing Maven dependencies for $service..."
+                cd ../vertx-service
+                mvn -B -DskipTests dependency:resolve
+                cd -
+                ;;
+              react-app)
+                echo "📦 Installing Node.js dependencies for $service..."
+                cd ../react-app
+                npm ci
+                cd -
+                ;;
+            esac
+
+            IMAGE_NAME="${service}:${COMMIT_SHA}"
+            echo "🛠 Building Docker image for $service -> $IMAGE_NAME..."
+            docker compose -f docker/docker-compose.build.yml build --build-arg BUILDKIT_INLINE_CACHE=1 $service
+            docker tag $service:latest $IMAGE_NAME
+          done
+
+      # 5️⃣ Remove old Docker images (except Couchbase & Kafka)
+      - name: Cleanup old Docker images
+        run: |
+          echo "🧹 Removing old Docker images (except couchbase & kafka)..."
+          for image in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep -vE "^(couchbase|kafka)"); do
+            echo "Deleting $image"
+            docker rmi -f $image || true
+          done
+
+      # 6️⃣ Ensure Couchbase & Kafka containers exist and are running
+      - name: Start Infra Services (Couchbase & Kafka)
+        run: |
+          for service in couchbase kafka; do
+            if [ "$(docker ps -q -f name=$service)" ]; then
+              echo "✅ $service already running."
+            else
+              if [ "$(docker ps -aq -f name=$service)" ]; then
+                echo "⚠️ $service exists but stopped. Starting..."
+                docker start $service
+              else
+                echo "🆕 Creating $service container..."
+                docker compose -f docker/docker-compose-services.yml up -d $service
+              fi
+            fi
+          done
+
+      # 7️⃣ Wait for Couchbase & Kafka readiness
+      - name: Wait for Couchbase & Kafka
         run: |
           echo "⏳ Waiting for Couchbase to become healthy..."
-          MAX_RETRIES=30
-          COUNT=0
-          STATUS=""
-
+          MAX_RETRIES=30; COUNT=0; STATUS=""
           while [ "$COUNT" -lt "$MAX_RETRIES" ]; do
             STATUS=$(docker inspect --format='{{.State.Health.Status}}' couchbase 2>/dev/null || echo "unknown")
-            if [ "$STATUS" == "healthy" ]; then
-              echo "✅ Couchbase is healthy."
-              break
-            fi
+            [ "$STATUS" == "healthy" ] && break
             echo "Couchbase not ready yet... ($((COUNT+1))/$MAX_RETRIES)"
-            sleep 5
-            COUNT=$((COUNT + 1))
+            sleep 5; COUNT=$((COUNT+1))
           done
-
-          if [ "$STATUS" != "healthy" ]; then
-            echo "❌ Couchbase failed to become healthy within timeout." >&2
-            docker logs couchbase >&2
-            exit 1
-          fi
+          [ "$STATUS" != "healthy" ] && echo "❌ Couchbase failed." >&2 && docker logs couchbase >&2 && exit 1
+          echo "✅ Couchbase is healthy."
 
           echo "⏳ Waiting for Kafka to become reachable..."
-          MAX_RETRIES=30
-          COUNT=0
+          MAX_RETRIES=30; COUNT=0
           while [ "$COUNT" -lt "$MAX_RETRIES" ]; do
-            if docker exec kafka bash -c "nc -z localhost 9092"; then
-              echo "✅ Kafka is reachable."
-              break
-            fi
+            docker exec kafka bash -c "nc -z localhost 9092" && break
             echo "Kafka not ready yet... ($((COUNT+1))/$MAX_RETRIES)"
-            sleep 5
-            COUNT=$((COUNT + 1))
+            sleep 5; COUNT=$((COUNT+1))
           done
+          [ "$COUNT" -eq "$MAX_RETRIES" ] && echo "❌ Kafka failed." >&2 && docker logs kafka >&2 && exit 1
+          echo "✅ Kafka is reachable."
 
-          if [ "$COUNT" -eq "$MAX_RETRIES" ]; then
-            echo "❌ Kafka failed to start within timeout." >&2
-            docker logs kafka >&2
-            exit 1
-          fi
-
-      # 7️⃣ Deploy to Kubernetes
+      # 8️⃣ Deploy updated services to Kubernetes
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/deploy-spring.yaml
-          kubectl apply -f k8s/deploy-vertx.yaml
-          kubectl apply -f k8s/deploy-react.yaml
+          for service in spring-api vertx react-app; do
+            if echo "$CHANGED_SERVICES" | grep -q "$service"; then
+              echo "📦 Deploying updated $service..."
+              kubectl apply -f k8s/deploy-$service.yaml
+            else
+              echo "⏭ Skipping $service deployment (no changes)"
+            fi
+          done
 
-      # 8️⃣ Apply Ingress (dynamic)
+      # 9️⃣ Apply Ingress dynamically
       - name: Apply Ingress
         run: |
           sed -e "s/APP_HOST/app.${VM_IP}.${NIP_DOMAIN}/" \
@@ -131,22 +151,20 @@ jobs:
               k8s/ingress.yaml > k8s/ingress.tmp.yaml
           kubectl apply -f k8s/ingress.tmp.yaml
 
-      # 9️⃣ Verify Kubernetes rollouts
+      # 🔟 Verify Kubernetes rollouts
       - name: Verify K8s Rollouts
         run: |
           kubectl -n $K8S_NAMESPACE rollout status deployment/spring-api
           kubectl -n $K8S_NAMESPACE rollout status deployment/vertx
           kubectl -n $K8S_NAMESPACE rollout status deployment/react
 
-      # 🔟 Show Infra Status
+      # 1️⃣1️⃣ Show Infra Status
       - name: Show Infra Status
         run: |
-          echo "📦 Couchbase container status:"
           docker ps --filter "name=couchbase"
-          echo "📦 Kafka container status:"
           docker ps --filter "name=kafka"
 
-      # 1️⃣1️⃣ Print Access URLs
+      # 1️⃣2️⃣ Print Access URLs
       - name: Print Access URLs
         run: |
           echo "🌐 React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"

@@ -1,19 +1,19 @@
-# Build stage
-FROM eclipse-temurin:11 as build
-
-# Install Maven
-RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*
-
+FROM eclipse-temurin:11 AS build
 WORKDIR /app
-COPY pom.xml ./
+
+# 1️⃣ Copy build files for caching dependencies
+COPY build.gradle settings.gradle ./
+RUN ./gradlew --no-daemon build || true
+
+# 2️⃣ Copy source code
 COPY src ./src
 
-# Build Vert.x JAR
-RUN mvn clean package -DskipTests
+# 3️⃣ Build final jar
+RUN ./gradlew --no-daemon shadowJar
 
-# Runtime stage
-FROM eclipse-temurin:11-jre-alpine
+# 4️⃣ Final runtime image
+FROM eclipse-temurin:11-jre
 WORKDIR /app
-COPY --from=build /app/target/*.jar vertx.jar
-EXPOSE 8080
-CMD ["java", "-jar", "/app/vertx.jar"]
+COPY --from=build /app/build/libs/*.jar app.jar
+EXPOSE 8081
+ENTRYPOINT ["java","-jar","app.jar"]
