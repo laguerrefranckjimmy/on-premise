@@ -8,9 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+
     env:
-      GHCR_USER: laguerrefranckjimmy
-      GHCR_REGISTRY: ghcr.io/laguerrefranckjimmy
       K8S_NAMESPACE: learning01
       VM_IP: 10.0.2.15
       NIP_DOMAIN: nip.io
@@ -36,51 +35,59 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 4️⃣ Login to GitHub Container Registry (GHCR)
-      - name: Login to GHCR
-        id: login-ghcr
-        continue-on-error: true
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ env.GHCR_USER }}
-          password: ${{ secrets.GHCR_PAT }}
-
-      - name: Check GHCR login result
-        if: steps.login-ghcr.outcome != 'success'
-        run: echo "⚠️ GHCR login failed. Continuing without pushing images."
-
-      # 5️⃣ Build & Push Docker Images (gracefully skip push if login failed)
-      - name: Build & Push Docker Images
+      # 4️⃣ Build Docker images locally (no push)
+      - name: Build Docker Images (local only)
         run: |
-          echo "🚀 Building images..."
+          echo "🚀 Building all service images locally..."
           docker compose -f docker/docker-compose.build.yml build
 
-          echo "📦 Pushing images (if logged in)..."
-          docker compose -f docker/docker-compose.build.yml push || echo "⚠️ Push skipped due to missing GHCR credentials."
-
-      # 6️⃣ Start Couchbase & Kafka
-      - name: Start Infra Services
-        run: docker compose -f docker/docker-compose-services.yml up -d
-
-      # 7️⃣ Wait for Infra readiness via Docker healthchecks
-      - name: Wait for Couchbase & Kafka
+      # 5️⃣ Ensure Couchbase & Kafka containers exist and are running
+      - name: Start Infra Services (only if not running)
         run: |
-          echo "Waiting for Couchbase..."
+          echo "🔍 Checking Couchbase..."
+          if [ "$(docker ps -q -f name=couchbase)" ]; then
+            echo "✅ Couchbase already running."
+          else
+            if [ "$(docker ps -aq -f name=couchbase)" ]; then
+              echo "⚠️ Couchbase container exists but stopped. Starting..."
+              docker start couchbase
+            else
+              echo "🆕 Creating Couchbase container..."
+              docker compose -f docker/docker-compose-services.yml up -d couchbase
+            fi
+          fi
+
+          echo "🔍 Checking Kafka..."
+          if [ "$(docker ps -q -f name=kafka)" ]; then
+            echo "✅ Kafka already running."
+          else
+            if [ "$(docker ps -aq -f name=kafka)" ]; then
+              echo "⚠️ Kafka container exists but stopped. Starting..."
+              docker start kafka
+            else
+              echo "🆕 Creating Kafka container..."
+              docker compose -f docker/docker-compose-services.yml up -d kafka
+            fi
+          fi
+
+      # 6️⃣ Wait for Infra readiness
+      - name: Wait for Couchbase & Kafka readiness
+        run: |
+          echo "Waiting for Couchbase to become healthy..."
           until [ "$(docker inspect --format='{{.State.Health.Status}}' couchbase 2>/dev/null)" == "healthy" ]; do
-            echo "Couchbase not ready..."
+            echo "Couchbase not ready yet..."
             sleep 5
           done
-          echo "✅ Couchbase ready!"
+          echo "✅ Couchbase is healthy."
 
-          echo "Waiting for Kafka..."
+          echo "Waiting for Kafka to become healthy..."
           until [ "$(docker inspect --format='{{.State.Health.Status}}' kafka 2>/dev/null)" == "healthy" ]; do
-            echo "Kafka not ready..."
+            echo "Kafka not ready yet..."
             sleep 5
           done
-          echo "✅ Kafka ready!"
+          echo "✅ Kafka is healthy."
 
-      # 8️⃣ Deploy to Kubernetes
+      # 7️⃣ Deploy to Kubernetes
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f k8s/namespace.yaml
@@ -88,7 +95,7 @@ jobs:
           kubectl apply -f k8s/deploy-vertx.yaml
           kubectl apply -f k8s/deploy-react.yaml
 
-      # 9️⃣ Apply Ingress with dynamic hosts
+      # 8️⃣ Apply Ingress (dynamic)
       - name: Apply Ingress
         run: |
           sed -e "s/APP_HOST/app.${VM_IP}.${NIP_DOMAIN}/" \
@@ -97,26 +104,22 @@ jobs:
               k8s/ingress.yaml > k8s/ingress.tmp.yaml
           kubectl apply -f k8s/ingress.tmp.yaml
 
-      # 🔟 Wait for Kubernetes rollouts
+      # 9️⃣ Verify Kubernetes rollouts
       - name: Verify K8s Rollouts
         run: |
           kubectl -n $K8S_NAMESPACE rollout status deployment/spring-api
           kubectl -n $K8S_NAMESPACE rollout status deployment/vertx
           kubectl -n $K8S_NAMESPACE rollout status deployment/react
 
-      # 1️⃣1️⃣ Show Infra container status and logs
+      # 🔟 Show Infra Status
       - name: Show Infra Status
         run: |
-          echo "Couchbase container status:"
+          echo "📦 Couchbase container status:"
           docker ps --filter "name=couchbase"
-          echo "Kafka container status:"
+          echo "📦 Kafka container status:"
           docker ps --filter "name=kafka"
-          echo "Couchbase logs (last 10 lines):"
-          docker logs --tail 10 couchbase
-          echo "Kafka logs (last 10 lines):"
-          docker logs --tail 10 kafka
 
-      # 1️⃣2️⃣ Print Access URLs
+      # 1️⃣1️⃣ Print Access URLs
       - name: Print Access URLs
         run: |
           echo "🌐 React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"
