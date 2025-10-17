@@ -21,7 +21,7 @@ jobs:
 
       # 2️⃣ Run deployment script
       - name: Run deployment
-        run: ./script/deploy.sh
+        run: ./script/ci-cd.sh
 
       # 3️⃣ Show Infra Status
       - name: Show Infra Status
