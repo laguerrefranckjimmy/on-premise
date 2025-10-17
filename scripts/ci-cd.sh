@@ -2,10 +2,6 @@
 set -e
 
 # ===== CONFIGURATION =====
-GITHUB_USER="laguerrefranckjimmy"
-REPO_NAME="on-premise"
-BRANCH="main"
-
 GHCR_USER="laguerrefranckjimmy"
 # export GHCR_PAT=<your_personal_access_token>
 
@@ -37,18 +33,6 @@ cleanup_docker() {
     docker network prune -f
     echo "✅ Docker cleanup complete!"
 }
-
-# ===== CLONE OR UPDATE REPO =====
-if [ ! -d "$HOME/$REPO_NAME" ]; then
-    echo "Cloning repository..."
-    git clone https://github.com/$GITHUB_USER/$REPO_NAME.git
-else
-    echo "Repository exists. Pulling latest changes..."
-    cd $HOME/$REPO_NAME
-    git checkout $BRANCH
-    git pull origin $BRANCH
-fi
-cd $HOME/$REPO_NAME
 
 # ===== CLEANUP BEFORE BUILD =====
 cleanup_docker

@@ -15,22 +15,26 @@ jobs:
       NIP_DOMAIN: nip.io
 
     steps:
-      # 1️⃣ Ensure deploy script is executable
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Ensure deploy script is executable
       - name: Ensure deploy script is executable
         run: chmod +x ./scripts/ci-cd.sh
 
-      # 2️⃣ Run deployment script
+      # 3️⃣ Run deployment script
       - name: Run deployment
         run: ./scripts/ci-cd.sh
 
-      # 3️⃣ Show Infra Status
+      # 4️⃣ Show Infra Status
       - name: Show Infra Status
         run: |
           echo "🔍 Checking infrastructure containers..."
           docker ps --filter "name=couchbase"
           docker ps --filter "name=kafka"
 
-      # 4️⃣ Print Access URLs
+      # 5️⃣ Print Access URLs
       - name: Print Access URLs
         run: |
           echo "🌐 React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"
