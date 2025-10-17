@@ -1,20 +1,4 @@
-# Use multi-stage build for smaller images
-FROM maven:3.9.2-eclipse-temurin-11 AS build
+FROM eclipse-temurin:11-jre-alpine
 WORKDIR /app
-
-# 1️⃣ Copy only pom.xml to leverage cache
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
-# 2️⃣ Copy the source code
-COPY src ./src
-
-# 3️⃣ Build the application
-RUN mvn package -DskipTests
-
-# 4️⃣ Final image
-FROM eclipse-temurin:11-jre
-WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java","-jar","app.jar"]
+COPY target/*.jar /app/app.jar
+CMD ["java","-jar","/app/app.jar"]
