@@ -17,7 +17,7 @@ jobs:
     steps:
       # 1️⃣ Ensure deploy script is executable
       - name: Ensure deploy script is executable
-        run: chmod +x ./script/deploy.sh
+        run: chmod +x ./script/ci-cd.sh
 
       # 2️⃣ Run deployment script
       - name: Run deployment
