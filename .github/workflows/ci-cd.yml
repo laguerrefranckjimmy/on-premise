@@ -3,26 +3,34 @@ name: CI/CD Deploy
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch:  # allow manual trigger
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: self-hosted   # your Ubuntu VM with Docker + K3s
 
     env:
-      K8S_NAMESPACE: learning01
+      # GHCR_PAT: ${{ secrets.GHCR_PAT }}
       VM_IP: 10.0.2.15
       NIP_DOMAIN: nip.io
 
     steps:
+      # 1️⃣ Ensure deploy script is executable
+      - name: Ensure deploy script is executable
+        run: chmod +x ./script/deploy.sh
 
-      # 1️⃣3️⃣ Show Infra Status
+      # 2️⃣ Run deployment script
+      - name: Run deployment
+        run: ./script/deploy.sh
+
+      # 3️⃣ Show Infra Status
       - name: Show Infra Status
         run: |
+          echo "🔍 Checking infrastructure containers..."
           docker ps --filter "name=couchbase"
           docker ps --filter "name=kafka"
 
-      # 1️⃣4️⃣ Print Access URLs
+      # 4️⃣ Print Access URLs
       - name: Print Access URLs
         run: |
           echo "🌐 React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"

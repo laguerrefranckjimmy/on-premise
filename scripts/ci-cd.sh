@@ -28,6 +28,16 @@ NIP_DOMAIN="nip.io"
 INGRESS_FILE="k8s/ingress.yaml"
 INGRESS_TMP="k8s/ingress.tmp.yaml"
 
+# ===== CLEANUP FUNCTION =====
+cleanup_docker() {
+    echo "🧹 Cleaning up old and dangling Docker images..."
+    docker image prune -af
+    docker container prune -f
+    docker volume prune -f
+    docker network prune -f
+    echo "✅ Docker cleanup complete!"
+}
+
 # ===== CLONE OR UPDATE REPO =====
 if [ ! -d "$HOME/$REPO_NAME" ]; then
     echo "Cloning repository..."
@@ -38,8 +48,10 @@ else
     git checkout $BRANCH
     git pull origin $BRANCH
 fi
-
 cd $HOME/$REPO_NAME
+
+# ===== CLEANUP BEFORE BUILD =====
+cleanup_docker
 
 # ===== BUILD PROJECTS =====
 echo "Building Spring Boot..."
@@ -68,10 +80,7 @@ VERTX_JAR=$(find $VERTX_DIR/target -name "*.jar" | head -n1)
 echo "Spring JAR: $SPRING_JAR"
 echo "Vert.x JAR: $VERTX_JAR"
 
-# ===== LOGIN TO GHCR =====
-echo $GHCR_PAT | docker login ghcr.io -u $GHCR_USER --password-stdin
-
-# ===== BUILD AND PUSH DOCKER IMAGES =====
+# ===== BUILD DOCKER IMAGES =====
 declare -A IMAGES
 IMAGES=(
     ["spring-api"]=$SPRING_DOCKERFILE
@@ -80,34 +89,48 @@ IMAGES=(
 )
 
 for service in "${!IMAGES[@]}"; do
-    echo "Processing $service..."
+    echo "Building image for $service..."
     case $service in
         "spring-api")
-            if [ ! -f "$SPRING_JAR" ]; then
-                echo "Skipping $service Docker build: JAR not found."
-                continue
-            fi
-            docker build -t ghcr.io/$GHCR_USER/$service:latest -f $SPRING_DOCKERFILE $SPRING_DIR
+            docker build -t $service:latest -f $SPRING_DOCKERFILE $SPRING_DIR
             ;;
         "vertx-service")
-            if [ ! -f "$VERTX_JAR" ]; then
-                echo "Skipping $service Docker build: JAR not found."
-                continue
-            fi
-            docker build -t ghcr.io/$GHCR_USER/$service:latest -f $VERTX_DOCKERFILE $VERTX_DIR
+            docker build -t $service:latest -f $VERTX_DOCKERFILE $VERTX_DIR
             ;;
         "react-app")
-            if [ ! -d "$REACT_DIR/build" ]; then
-                echo "Skipping $service Docker build: build directory not found."
-                continue
-            fi
-            docker build -t ghcr.io/$GHCR_USER/$service:latest -f $REACT_DOCKERFILE $REACT_DIR
+            docker build -t $service:latest -f $REACT_DOCKERFILE $REACT_DIR
             ;;
     esac
-    docker push ghcr.io/$GHCR_USER/$service:latest
 done
 
-echo "✅ Docker images built and pushed!"
+echo "✅ Docker images built locally!"
+
+# ===== OPTIONAL: PUSH TO GHCR IF TOKEN AVAILABLE =====
+if [ -n "$GHCR_PAT" ]; then
+    echo "🔐 GHCR_PAT found — pushing images to GHCR..."
+    echo $GHCR_PAT | docker login ghcr.io -u $GHCR_USER --password-stdin
+    for service in "${!IMAGES[@]}"; do
+        docker tag $service:latest ghcr.io/$GHCR_USER/$service:latest
+        docker push ghcr.io/$GHCR_USER/$service:latest
+    done
+else
+    echo "⚠️ GHCR_PAT not set — skipping push to GHCR."
+fi
+
+# ===== IMPORT IMAGES INTO K3S =====
+echo "📦 Importing images into K3s..."
+SUDO=""
+if [ "$EUID" -ne 0 ]; then
+    SUDO="sudo"
+fi
+
+for service in "${!IMAGES[@]}"; do
+    TAR_FILE="/tmp/${service}.tar"
+    docker save $service:latest -o $TAR_FILE
+    $SUDO k3s ctr images import $TAR_FILE
+    rm -f $TAR_FILE
+done
+echo "✅ Images imported into K3s!"
 
 # ===== APPLY K8S MANIFESTS =====
 kubectl apply -f k8s/namespace.yaml
@@ -117,7 +140,6 @@ kubectl apply -f k8s/deploy-react.yaml
 
 # ===== UPDATE INGRESS HOSTNAMES =====
 if [ -f "$INGRESS_FILE" ]; then
-    # Replace placeholders with RFC 1123 compatible hostnames
     sed -e "s/APP_HOST/app.$VM_IP.$NIP_DOMAIN/" \
         -e "s/API_HOST/api.$VM_IP.$NIP_DOMAIN/" \
         -e "s/VERTX_HOST/vertx.$VM_IP.$NIP_DOMAIN/" \
@@ -127,13 +149,20 @@ if [ -f "$INGRESS_FILE" ]; then
     kubectl apply -f $INGRESS_TMP
 fi
 
-# ===== WAIT FOR DEPLOYMENTS =====
+# ===== RESTART & WAIT FOR DEPLOYMENTS =====
+kubectl -n $K8S_NAMESPACE rollout restart deployment/$K8S_DEPLOY_SPRING
+kubectl -n $K8S_NAMESPACE rollout restart deployment/$K8S_DEPLOY_VERTX
+kubectl -n $K8S_NAMESPACE rollout restart deployment/$K8S_DEPLOY_REACT
+
 kubectl -n $K8S_NAMESPACE rollout status deployment/$K8S_DEPLOY_SPRING
 kubectl -n $K8S_NAMESPACE rollout status deployment/$K8S_DEPLOY_VERTX
 kubectl -n $K8S_NAMESPACE rollout status deployment/$K8S_DEPLOY_REACT
 
 # ===== LIST PODS & SERVICES =====
 kubectl -n $K8S_NAMESPACE get pods,svc
+
+# ===== CLEANUP AFTER BUILD =====
+cleanup_docker
 
 # ===== PRINT ACCESS URLS =====
 echo "✅ All deployments updated successfully!"
