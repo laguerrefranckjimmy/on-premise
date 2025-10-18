@@ -49,11 +49,7 @@ cd ..
 
 echo "Building Vert.x..."
 cd $VERTX_DIR
-if [ -f "./mvnw" ]; then
-    ./mvnw clean package -DskipTests
-else
-    mvn clean package -DskipTests
-fi
+mvn clean package -DskipTests
 cd ..
 
 echo "Building React..."
@@ -67,17 +63,6 @@ SPRING_JAR=$(find $SPRING_DIR/target -name "*.jar" | head -n1)
 VERTX_JAR=$(find $VERTX_DIR/target -name "*.jar" | head -n1)
 echo "Spring JAR: $SPRING_JAR"
 echo "Vert.x JAR: $VERTX_JAR"
-
-# ===== VERIFY JAR FILES =====
-if ! jar tf "$SPRING_JAR" | grep -q "Main-Class"; then
-    echo "❌ Spring Boot JAR is missing Main-Class. Check your Maven configuration."
-    exit 1
-fi
-
-if ! jar tf "$VERTX_JAR" | grep -q "Main-Class"; then
-    echo "❌ Vert.x JAR is missing Main-Class. Check your Maven configuration."
-    exit 1
-fi
 
 # ===== BUILD DOCKER IMAGES =====
 declare -A IMAGES
