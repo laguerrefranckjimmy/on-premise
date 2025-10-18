@@ -2,7 +2,7 @@ package com.example;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 @RestController
-@RequestMapping("/api/items")
+@RequestMapping("spring/api/items")
 public class ItemController {
   private final List<Map<String,Object>> items = Collections.synchronizedList(new ArrayList<>());
   @GetMapping
