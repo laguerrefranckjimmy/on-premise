@@ -1,0 +1,55 @@
+import React, { useState } from 'react';
+import axios from 'axios';
+
+function NewOrderPage() {
+  const [productId, setProductId] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [message, setMessage] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('http://localhost:8080/api/inventory/order', {
+        productId,
+        quantity,
+        orderId: `ORD-${Date.now()}`
+      });
+      setMessage(`Order created successfully!`);
+      setProductId('');
+      setQuantity(1);
+    } catch (err) {
+      setMessage(`Failed to create order: ${err.response?.data || err.message}`);
+    }
+  };
+
+  return (
+    <div>
+      <h2>Create New Order</h2>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Product ID: </label>
+          <input
+            type="text"
+            value={productId}
+            onChange={e => setProductId(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label>Quantity: </label>
+          <input
+            type="number"
+            value={quantity}
+            onChange={e => setQuantity(Number(e.target.value))}
+            min="1"
+            required
+          />
+        </div>
+        <button type="submit">Create Order</button>
+      </form>
+      {message && <p>{message}</p>}
+    </div>
+  );
+}
+
+export default NewOrderPage;
