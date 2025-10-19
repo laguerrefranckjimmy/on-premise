@@ -1,0 +1,10 @@
+server:
+  port: 8080
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+kafka:
+  topic:
+    inventory-updated: inventory.updated
+    order-created: order.created

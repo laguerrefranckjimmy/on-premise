@@ -28,6 +28,12 @@
       <artifactId>vertx-web</artifactId>
       <version>4.4.4</version>
     </dependency>
+    <dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-kafka-client</artifactId>
+      <version>4.4.4</version> <!-- Use latest compatible version -->
+    </dependency>
+
   </dependencies>
 
   <build>
