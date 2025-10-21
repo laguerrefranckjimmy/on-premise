@@ -1,0 +1,42 @@
+<configuration>
+
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"/>
+
+    <!-- Console logging -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Splunk HEC Appender -->
+    <appender name="SPLUNK" class="com.splunk.logging.HttpEventCollectorLogbackAppender">
+        <url>${SPLUNK_HEC_URL:-https://YOUR-SPLUNK-HEC-ENDPOINT:8088}</url>
+        <token>${SPLUNK_HEC_TOKEN:-YOUR-HEC-TOKEN-HERE}</token>
+        <source>spring-api</source>
+        <sourcetype>_json</sourcetype>
+        <host>${HOSTNAME}</host>
+        <index>${SPLUNK_HEC_INDEX:-main}</index>
+        <batch_size_count>1</batch_size_count>
+
+        <layout class="ch.qos.logback.contrib.json.classic.JsonLayout">
+            <appendLineSeparator>true</appendLineSeparator>
+            <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter" />
+            <timestampFormat>yyyy-MM-dd'T'HH:mm:ss.SSSZ</timestampFormat>
+            <timestampFormatTimezoneId>UTC</timestampFormatTimezoneId>
+            <includeContextName>true</includeContextName>
+            <includeMDC>true</includeMDC>
+            <includeLevel>true</includeLevel>
+            <includeThreadName>true</includeThreadName>
+            <includeLoggerName>true</includeLoggerName>
+            <includeFormattedMessage>true</includeFormattedMessage>
+        </layout>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="SPLUNK" />
+    </root>
+
+</configuration>

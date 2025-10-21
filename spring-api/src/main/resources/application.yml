@@ -2,9 +2,72 @@ server:
   port: 8080
 
 spring:
+  application:
+    name: spring-api
+  couchbase:
+    connection-string: ${COUCHBASE_HOST:localhost}
+    username: ${COUCHBASE_USERNAME:Administrator}
+    password: ${COUCHBASE_PASSWORD:password}
+    bucket:
+      inventory: inventory
+      orders: orders
+  data:
+    couchbase:
+      auto-index: true
   kafka:
-    bootstrap-servers: localhost:9092
-kafka:
-  topic:
-    inventory-updated: inventory.updated
-    order-created: order.created
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: spring-api-group
+      properties:
+        spring.json.trusted.packages: "*"
+    topic:
+      inventory: inventory.updated
+      orders: orders.created
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    com.example: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# ================================
+# VERT.X CONFIGURATION
+# ================================
+vertx:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    group-id: vertx-consumer-group
+    topic-inventory: inventory.updated
+    topic-orders: orders.created
+  websocket:
+    host: 0.0.0.0
+    port: 8090
+  eventbus:
+    address:
+      inventory: inventory.events
+      orders: order.events
+
+# ================================
+# SPLUNK (HEC) PLACEHOLDERS
+# ================================
+splunk:
+  hec:
+    url: ${SPLUNK_HEC_URL:https://YOUR-SPLUNK-HEC-ENDPOINT:8088}
+    token: ${SPLUNK_HEC_TOKEN:YOUR-HEC-TOKEN-HERE}
+    index: ${SPLUNK_HEC_INDEX:main}

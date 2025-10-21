@@ -4,6 +4,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.http.ServerWebSocket;
 import io.vertx.kafka.client.consumer.KafkaConsumer;
+import io.vertx.core.json.JsonObject;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -17,16 +18,28 @@ public class RealTimeVertxServer extends AbstractVerticle {
 
     @Override
     public void start(Promise<Void> startPromise) {
-        // WebSocket server for React clients
+        // WebSocket server
         vertx.createHttpServer().webSocketHandler(ws -> {
-            clients.put(ws.textHandlerID(), ws);
-            ws.closeHandler(v -> clients.remove(ws.textHandlerID()));
-        }).listen(8081);
+            // Accept only specific path
+            if (!"/ws".equals(ws.path())) {
+                ws.reject();
+                return;
+            }
+            String id = ws.textHandlerID();
+            clients.put(id, ws);
+            ws.closeHandler(v -> clients.remove(id));
+        }).listen(8081, ar -> {
+            if (ar.succeeded()) {
+                System.out.println("Vert.x WebSocket server listening on 8081 (path /ws)");
+            } else {
+                ar.cause().printStackTrace();
+            }
+        });
 
         // Kafka consumer
         Properties props = new Properties();
         props.put("bootstrap.servers", "localhost:9092");
-        props.put("group.id", "vertx-consumer");
+        props.put("group.id", "realtime-group");
         props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 
@@ -34,9 +47,12 @@ public class RealTimeVertxServer extends AbstractVerticle {
         consumer.subscribe((Set<String>) Arrays.asList("order.created", "inventory.updated"));
 
         consumer.handler(record -> {
+            String value = record.value();
             // Broadcast event to all connected React clients
-            for(ServerWebSocket ws : clients.values()) {
-                ws.writeTextMessage(record.value());
+            for (ServerWebSocket ws : clients.values()) {
+                if (!ws.isClosed()) {
+                    ws.writeTextMessage(value);
+                }
             }
         });
     }
