@@ -1,31 +1,36 @@
-import React, { useState } from 'react'
-import axios from 'axios'
+import React, { useState } from 'react';
+import axios from 'axios';
 
 function NewOrderPage() {
-  const [productId, setProductId] = useState('')
-  const [quantity, setQuantity] = useState(1)
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const [productId, setProductId] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState(''); // 'success' or 'error'
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
 
     try {
-      await axios.post('http://localhost:8080/api/inventory/order', {
+      await axios.post('http://127.0.0.1:8080/api/orders', {
         productId,
         quantity,
         orderId: `ORD-${Date.now()}`,
-      })
+      });
 
-      setMessage('✅ Order created successfully!')
-      setMessageType('success')
-      setProductId('')
-      setQuantity(1)
+      setMessage('✅ Order created successfully!');
+      setMessageType('success');
+      setProductId('');
+      setQuantity(1);
     } catch (err) {
-      setMessage(`❌ Failed to create order: ${err.response?.data || err.message}`)
-      setMessageType('error')
+      setMessage(
+        `❌ Failed to create order: ${
+          err.response?.data?.message || err.response?.data || err.message
+        }`
+      );
+      setMessageType('error');
+      console.error('Create order error:', err);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
@@ -77,7 +82,7 @@ function NewOrderPage() {
         </form>
       </div>
     </div>
-  )
+  );
 }
 
-export default NewOrderPage
+export default NewOrderPage;

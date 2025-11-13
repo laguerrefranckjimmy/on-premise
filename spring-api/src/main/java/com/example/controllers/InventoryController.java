@@ -1,18 +1,24 @@
-package com.example;
+package com.example.controllers;
 
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.header.internals.RecordHeader;
+import com.example.Application;
+import com.example.repositories.InventoryRepository;
+import com.example.kafka.OutboxEvent;
+import com.example.repositories.OutboxRepository;
+import com.example.models.Inventory;
+import com.example.models.Order;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
 public class InventoryController {
+    private static final Logger log = LoggerFactory.getLogger(InventoryController.class);
 
     private final InventoryRepository repository;
     private final OutboxRepository outboxRepository;
@@ -36,16 +42,20 @@ public class InventoryController {
     @PostMapping("/inventory")
     public ResponseEntity<Inventory> addInventory(@RequestHeader(value = "X-Correlation-ID", required = false) String corrId,
                                                   @RequestBody Inventory inventory) {
+
+        log.info("Adding new Inventory.");
         String correlationId = ensureCorrelationId(corrId);
+        log.info("Using Correlation ID: {}", correlationId);
         MDC.put("correlationId", correlationId);
         try {
             // save to DB
             Inventory saved = repository.save(inventory);
+            log.info("Inventory saved to couchbase");
 
             // create outbox event
             OutboxEvent evt = OutboxEvent.forInventoryUpdated(saved.getProductId(), saved.getQuantity(), correlationId);
             outboxRepository.save(evt);
-
+            log.info("Created outbox event with id: {}", evt.getId());
             return ResponseEntity.ok(saved);
         } finally {
             MDC.remove("correlationId");
@@ -55,7 +65,10 @@ public class InventoryController {
     @PostMapping("/orders")
     public ResponseEntity<Order> createOrder(@RequestHeader(value = "X-Correlation-ID", required = false) String corrId,
                                              @RequestBody Order order) {
+
+        log.info("Creating new Order.");
         String correlationId = ensureCorrelationId(corrId);
+        log.info("Using Correlation ID: {}", correlationId);
         MDC.put("correlationId", correlationId);
         try {
             // load inventory

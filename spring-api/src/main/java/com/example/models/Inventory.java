@@ -1,4 +1,4 @@
-package com.example;
+package com.example.models;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.couchbase.core.mapping.Document;

@@ -1,4 +1,4 @@
-package com.example;
+package com.example.kafka;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.couchbase.core.mapping.Document;
@@ -18,7 +18,8 @@ public class OutboxEvent {
     private Instant createdAt;
     private String correlationId;
 
-    public OutboxEvent() {}
+    public OutboxEvent() {
+    }
 
     public OutboxEvent(String topic, String payload, String correlationId) {
         this.id = UUID.randomUUID().toString();
@@ -45,12 +46,21 @@ public class OutboxEvent {
         return new OutboxEvent("order.created", p, correlationId);
     }
 
-    // getters and setters omitted for brevity - include as needed
-
     public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
     public String getTopic() { return topic; }
+    public void setTopic(String topic) { this.topic = topic; }
+
     public String getPayload() { return payload; }
+    public void setPayload(String payload) { this.payload = payload; }
+
     public boolean isSent() { return sent; }
     public void setSent(boolean sent) { this.sent = sent; }
+
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
     public String getCorrelationId() { return correlationId; }
+    public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
 }

@@ -4,18 +4,36 @@ server:
 spring:
   application:
     name: spring-api
+
   couchbase:
-    connection-string: ${COUCHBASE_HOST:localhost}
-    username: ${COUCHBASE_USERNAME:Administrator}
-    password: ${COUCHBASE_PASSWORD:password}
-    bucket:
-      inventory: inventory
-      orders: orders
+    connection-string: ${COUCHBASE_HOST:couchbases://cb.1pnnulwjzjmmofkj.cloud.couchbase.com}
+    username: ${COUCHBASE_USERNAME}
+    password: ${COUCHBASE_PASSWORD}
+    bucket-name: ${COUCHBASE_BUCKET}
+    env:
+      io:
+        enableDnsSrv: false
+      timeouts:
+        connect: 15s
+        key-value: 5s
+        query: 20s
+        search: 20s
+        view: 20s
+        management: 10s
+        analytics: 30s
+
   data:
     couchbase:
       auto-index: true
+
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:d41dlauc4cape6v41f4g.any.us-east-1.mpx.prd.cloud.redpanda.com:9092}
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: >
+        org.apache.kafka.common.security.scram.ScramLoginModule required
+        username="${KAFKA_USERNAME}" password="${KAFKA_PASSWORD}";
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -27,13 +45,12 @@ spring:
         spring.json.trusted.packages: "*"
     topic:
       inventory: inventory.updated
-      orders: orders.created
+      order: order.created
 
 logging:
   level:
     root: INFO
     org.springframework.web: INFO
-    com.example: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"
 
@@ -51,23 +68,23 @@ management:
 # ================================
 vertx:
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:d41dlauc4cape6v41f4g.any.us-east-1.mpx.prd.cloud.redpanda.com:9092}
     group-id: vertx-consumer-group
     topic-inventory: inventory.updated
-    topic-orders: orders.created
+    topic-order: order.created
   websocket:
     host: 0.0.0.0
     port: 8090
   eventbus:
     address:
-      inventory: inventory.events
-      orders: order.events
+      inventory: inventory.event
+      order: order.event
 
 # ================================
 # SPLUNK (HEC) PLACEHOLDERS
 # ================================
 splunk:
   hec:
-    url: ${SPLUNK_HEC_URL:https://YOUR-SPLUNK-HEC-ENDPOINT:8088}
-    token: ${SPLUNK_HEC_TOKEN:YOUR-HEC-TOKEN-HERE}
+    url: ${SPLUNK_HEC_URL:https://localhost:8088}
+    token: ${SPLUNK_HEC_TOKEN}
     index: ${SPLUNK_HEC_INDEX:main}

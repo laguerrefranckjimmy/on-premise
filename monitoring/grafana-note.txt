@@ -1,1 +1,0 @@
-Install Grafana and add Prometheus as a data source. Use dashboards to track pod memory/cpu and application metrics exposed on /actuator/prometheus (Spring) or Vert.x metrics.

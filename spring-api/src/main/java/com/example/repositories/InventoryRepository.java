@@ -1,5 +1,6 @@
-package com.example;
+package com.example.repositories;
 
+import com.example.models.Inventory;
 import org.springframework.data.couchbase.repository.CouchbaseRepository;
 import org.springframework.stereotype.Repository;
 
