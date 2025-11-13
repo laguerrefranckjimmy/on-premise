@@ -17,7 +17,7 @@ spec:
         - name: react
           image: react-app:latest
           ports:
-            - containerPort: 80
+            - containerPort: 80       # Nginx inside container listens on 80
           imagePullPolicy: IfNotPresent
 ---
 apiVersion: v1

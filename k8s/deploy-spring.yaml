@@ -21,10 +21,10 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: prod
-            - name: COUCHBASE_HOST
-              value: couchbase
-            - name: KAFKA_BROKER
-              value: kafka:9092
+          # Loads COUCHBASE_*, KAFKA_*, SPLUNK_HEC_TOKEN from your secret
+          envFrom:
+            - secretRef:
+                name: app-credentials
           imagePullPolicy: IfNotPresent
 ---
 apiVersion: v1

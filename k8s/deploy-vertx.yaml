@@ -16,11 +16,13 @@ spec:
       containers:
         - name: vertx
           image: vertx-service:latest
+          # Your Vert.x HTTP/WebSocket server listens on 8081 in the code
           ports:
-            - containerPort: 8080
-          env:
-            - name: KAFKA_BROKER
-              value: kafka:9092
+            - containerPort: 8081
+          # Gets KAFKA_USERNAME / KAFKA_PASSWORD (and others) from the same secret
+          envFrom:
+            - secretRef:
+                name: app-credentials
           imagePullPolicy: IfNotPresent
 ---
 apiVersion: v1
@@ -33,5 +35,5 @@ spec:
   selector:
     app: vertx
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: 8080        # what other services/Ingress call
+      targetPort: 8081  # actual port inside the Vert.x container

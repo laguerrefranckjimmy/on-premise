@@ -7,11 +7,28 @@ function NewOrderPage() {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
 
+  const getApiBaseUrl = () => {
+    // 1) Prefer explicit env var (best for dev / overrides)
+    const envUrl = import.meta.env?.VITE_API_BASE_URL;
+    if (envUrl) {
+      return envUrl.replace(/\/$/, ''); // remove trailing slash if any
+    }
+
+    // 2) Fallback: derive from current host
+    // If React is served from app.10.0.2.15.nip.io,
+    // call the API at api.10.0.2.15.nip.io/spring/api
+    const protocol = window.location.protocol; // http: or https:
+    const host = window.location.host.replace(/^app\./, 'api.');
+    return `${protocol}//${host}/spring/api`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const apiBase = getApiBaseUrl();
+
     try {
-      await axios.post('http://127.0.0.1:8080/api/orders', {
+      await axios.post(`${apiBase}/orders`, {
         productId,
         quantity,
         orderId: `ORD-${Date.now()}`,

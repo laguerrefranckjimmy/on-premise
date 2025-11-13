@@ -12,7 +12,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: react-svc
+                name: react
                 port:
                   number: 80
     - host: API_HOST
@@ -22,16 +22,23 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: spring-svc
+                name: spring-api
                 port:
                   number: 8080
     - host: VERTX_HOST
       http:
         paths:
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: vertx
+                port:
+                  number: 8080   # Service → pod:8081
           - path: /stream
             pathType: Prefix
             backend:
               service:
-                name: vertx-svc
+                name: vertx
                 port:
                   number: 8080
