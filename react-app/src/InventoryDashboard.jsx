@@ -5,10 +5,10 @@ function InventoryDashboard() {
   const [recentOrders, setRecentOrders] = useState([]);
   const [highlightedInventory, setHighlightedInventory] = useState([]);
   const [highlightedOrders, setHighlightedOrders] = useState([]);
-  const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('connecting');
+  const [wsStatus, setWsStatus] = useState('connecting');
 
   const getWebSocketUrl = () => {
-    // 1) Prefer an explicit env var (best for dev/k8s overrides)
+    // 1) Prefer explicit env var (great for dev/k8s overrides)
     const envUrl = import.meta.env?.VITE_WS_URL;
     if (envUrl) {
       return envUrl;
@@ -40,7 +40,7 @@ function InventoryDashboard() {
 
         if (data.type === 'inventory.updated') {
           // update inventory map
-          setInventory((prev: any) => ({
+          setInventory((prev) => ({
             ...prev,
             [data.productId]: data.quantity,
           }));
@@ -56,7 +56,7 @@ function InventoryDashboard() {
 
         if (data.type === 'order.created') {
           // prepend latest, keep last 10
-          setRecentOrders((prev: any[]) => [data, ...prev.slice(0, 9)]);
+          setRecentOrders((prev) => [data, ...prev.slice(0, 9)]);
 
           // highlight order briefly
           setHighlightedOrders((prev) => [...prev, data.orderId]);
@@ -123,7 +123,7 @@ function InventoryDashboard() {
                       }`}
                   >
                     <span className="font-medium">{product}</span>
-                    <span className="font-bold">{qty as any}</span>
+                    <span className="font-bold">{qty}</span>
                   </div>
                 );
               })}
@@ -138,7 +138,7 @@ function InventoryDashboard() {
             <div className="text-gray-500">No orders yet</div>
           ) : (
             <ul className="space-y-2">
-              {recentOrders.map((order: any) => {
+              {recentOrders.map((order) => {
                 const isHighlighted = highlightedOrders.includes(order.orderId);
                 return (
                   <li
