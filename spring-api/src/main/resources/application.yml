@@ -27,7 +27,7 @@ spring:
       auto-index: true
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:d41dlauc4cape6v41f4g.any.us-east-1.mpx.prd.cloud.redpanda.com:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:d4bp18ce45lfjaeu54kg.any.us-east-1.mpx.prd.cloud.redpanda.com:9092}
     properties:
       security.protocol: SASL_SSL
       sasl.mechanism: SCRAM-SHA-256
@@ -68,7 +68,7 @@ management:
 # ================================
 vertx:
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:d41dlauc4cape6v41f4g.any.us-east-1.mpx.prd.cloud.redpanda.com:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:d4bp18ce45lfjaeu54kg.any.us-east-1.mpx.prd.cloud.redpanda.com:9092}
     group-id: vertx-consumer-group
     topic-inventory: inventory.updated
     topic-order: order.created

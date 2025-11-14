@@ -78,7 +78,7 @@ public class RealTimeVertxServer extends AbstractVerticle {
 
     private void initKafkaConsumer() {
         Map<String, String> config = new HashMap<>();
-        config.put("bootstrap.servers", "d41dlauc4cape6v41f4g.any.us-east-1.mpx.prd.cloud.redpanda.com:9092");
+        config.put("bootstrap.servers", "d4bp18ce45lfjaeu54kg.any.us-east-1.mpx.prd.cloud.redpanda.com:9092");
         config.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         config.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         config.put("group.id", "realtime-group");
