@@ -26,17 +26,3 @@ jobs:
       # 3️⃣ Run deployment script
       - name: Run deployment
         run: ./scripts/ci-cd.sh
-
-      # 4️⃣ Show Infra Status
-      - name: Show Infra Status
-        run: |
-          echo "🔍 Checking infrastructure containers..."
-          docker ps --filter "name=couchbase"
-          docker ps --filter "name=kafka"
-
-      # 5️⃣ Print Access URLs
-      - name: Print Access URLs
-        run: |
-          echo "🌐 React frontend: http://app.${VM_IP}.${NIP_DOMAIN}"
-          echo "🌐 Spring Boot API: http://api.${VM_IP}.${NIP_DOMAIN}/spring/api/items"
-          echo "🌐 Vert.x stream: http://vertx.${VM_IP}.${NIP_DOMAIN}/stream"

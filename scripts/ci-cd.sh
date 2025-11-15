@@ -125,9 +125,3 @@ done
 kubectl -n $K8S_NAMESPACE get pods,svc
 
 cleanup_docker
-
-# ===== ACCESS URLs =====
-echo "✅ All services deployed successfully!"
-echo "🌐 React frontend: http://app.$VM_IP.$NIP_DOMAIN"
-echo "🌐 Spring Boot API: http://api.$VM_IP.$NIP_DOMAIN/spring/api/items"
-echo "🌐 Vert.x stream: http://vertx.$VM_IP.$NIP_DOMAIN/stream"
